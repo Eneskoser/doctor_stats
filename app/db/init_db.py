@@ -6,6 +6,9 @@ from app.core.config import settings
 
 
 def init_db() -> None:
+    # Drop all tables
+    Base.metadata.drop_all(bind=engine)
+    # Create all tables
     Base.metadata.create_all(bind=engine)
 
 

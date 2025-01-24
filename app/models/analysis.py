@@ -15,7 +15,7 @@ class AnalysisType(str, enum.Enum):
 
 class AnalysisStatus(str, enum.Enum):
     PENDING = "pending"
-    RUNNING = "running"
+    PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
 

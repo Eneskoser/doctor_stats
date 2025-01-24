@@ -2,6 +2,14 @@ from typing import Dict, List, Any, Optional
 import pandas as pd
 import numpy as np
 from scipy import stats
+import logging
+from sqlalchemy.orm import Session
+
+# Models
+from app.models.analysis import Analysis, AnalysisStatus  # Only import from models
+from app.models.dataset import Dataset
+
+# Schemas for return types
 from app.schemas.analysis import (
     BasicStatistics,
     ComparativeStatistics,
@@ -9,6 +17,8 @@ from app.schemas.analysis import (
     ChiSquareAnalysis,
     RegressionAnalysis,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisService:
@@ -40,6 +50,49 @@ class AnalysisService:
             raise ValueError(f"Unsupported analysis type: {analysis_type}")
 
         return await analysis_methods[analysis_type](df, config)
+
+    async def run_analysis_task(self, analysis_id: int, db: Session):
+        """Background task to handle the complete analysis workflow."""
+        try:
+            # Get analysis from database
+            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if not analysis:
+                logger.error(f"Analysis {analysis_id} not found")
+                return
+
+            # Update status to processing
+            analysis.status = AnalysisStatus.PROCESSING  # Using model's AnalysisStatus
+            db.commit()
+            logger.info(f"Starting analysis {analysis_id}")
+
+            # Get dataset
+            dataset = (
+                db.query(Dataset).filter(Dataset.id == analysis.dataset_id).first()
+            )
+            if not dataset:
+                raise ValueError(f"Dataset {analysis.dataset_id} not found")
+
+            # Load dataset
+            df = await self.load_dataset(dataset.file_path)
+            logger.info(f"Dataset loaded: {dataset.file_path}")
+
+            # Run the actual analysis using run_analysis method
+            results = await self.run_analysis(
+                df, analysis.type.value, analysis.parameters
+            )
+
+            # Update analysis with results
+            analysis.results = results
+            analysis.status = AnalysisStatus.COMPLETED  # Using model's AnalysisStatus
+            db.commit()
+            logger.info(f"Analysis {analysis_id} completed successfully")
+
+        except Exception as e:
+            logger.error(f"Error in analysis {analysis_id}: {str(e)}", exc_info=True)
+            analysis.status = AnalysisStatus.FAILED  # Using model's AnalysisStatus
+            analysis.error_message = str(e)
+            db.commit()
+            raise e
 
     async def _basic_statistics(
         self, df: pd.DataFrame, config: Dict[str, Any]
@@ -77,6 +130,9 @@ class AnalysisService:
             "kurtosis",
         ]
 
+        # Replace NaN values with None for JSON serialization
+        stats_df = stats_df.replace({np.nan: None, np.inf: None, -np.inf: None})
+
         # Calculate quartiles
         quartiles = df[columns].quantile([0.25, 0.75]).round(4)
         stats_df = pd.concat([stats_df, quartiles])
@@ -89,8 +145,8 @@ class AnalysisService:
         )
 
         return {
-            "descriptive_statistics": stats_df.to_dict(),
-            "missing_data": missing_stats.to_dict(),
+            "descriptive_statistics": stats_df.replace({np.nan: None}).to_dict(),
+            "missing_data": missing_stats.replace({np.nan: None}).to_dict(),
             "column_types": {col: str(df[col].dtype) for col in columns},
         }
 

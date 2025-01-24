@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { store } from '../store';
 import { logout } from '../store/slices/authSlice';
+import { AnalysisRequest } from '../types/analysis';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
 
@@ -102,20 +103,17 @@ export const datasetService = {
 
       // Create form data
       const formData = new FormData();
-      // Add fields in the correct order
+      formData.append('file', file);
       formData.append('name', file.name);
       formData.append('description', 'CSV file upload');
-      formData.append('file', file);
 
-      console.log('Uploading file:', file.name);
-      console.log('Form data entries:');
-      for (let [key, value] of formData.entries()) {
-        console.log(key, ':', value);
-      }
-
-      // Simple post request with FormData
-      const response = await axiosInstance.post('/datasets/upload', formData);
-      console.log('Upload successful:', response.data);
+      // Upload request
+      const response = await axiosInstance.post('/datasets/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
       return response.data;
     } catch (error: any) {
       console.error('Upload error:', error.response?.data || error.message);
@@ -133,23 +131,24 @@ export const datasetService = {
 };
 
 export const analysisService = {
+  create: async (request: AnalysisRequest) => {
+    const response = await axiosInstance.post('/analysis', request);
+    return response.data;
+  },
+
+  getAnalysis: async (analysisId: number) => {
+    const response = await axiosInstance.get(`/analysis/${analysisId}`);
+    return response.data;
+  },
+
   list: async () => {
-    const response = await axiosInstance.get('/analyses');
+    const response = await axiosInstance.get('/analysis');
     return response.data;
   },
-  create: async (request: { dataset_id: string; analysis_type: string; config: any }) => {
-    const response = await axiosInstance.post('/analyses', request);
-    return response.data;
-  },
-  getResults: async (datasetId: string, analysisType: string, config: any) => {
-    const response = await axiosInstance.get(`/analyses/${datasetId}/results`, {
-      params: { type: analysisType, ...config },
-    });
-    return response.data;
-  },
+
   delete: async (analysisId: string) => {
-    await axiosInstance.delete(`/analyses/${analysisId}`);
-  },
+    await axiosInstance.delete(`/analysis/${analysisId}`);
+  }
 };
 
 export const reportService = {

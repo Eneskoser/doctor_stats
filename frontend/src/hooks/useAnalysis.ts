@@ -5,13 +5,24 @@ import {
   AnalysisRequest,
   AnalysisType,
   AnalysisConfig,
-  AnalysisResult,
+  AnalysisResponse,
 } from '../types/analysis';
+
+// Separate hook for analysis status
+export const useAnalysisStatus = (analysisId: number) => {
+  return useQuery<AnalysisResponse>({
+    queryKey: ['analysis', analysisId],
+    queryFn: () => analysisService.getAnalysis(analysisId),
+    refetchInterval: (query) => 
+      query.data?.status === 'pending' || query.data?.status === 'processing' ? 2000 : false,
+    enabled: !!analysisId,
+  });
+};
 
 export const useAnalysis = (datasetId?: string) => {
   const queryClient = useQueryClient();
 
-  // Query for listing analyses
+  // Query for listing analyses - disabled by default
   const {
     data: analyses,
     isLoading: isLoadingAnalyses,
@@ -19,32 +30,20 @@ export const useAnalysis = (datasetId?: string) => {
   } = useQuery({
     queryKey: ['analyses', datasetId],
     queryFn: () => analysisService.list(),
-    enabled: !!datasetId,
+    enabled: false,  // Disable automatic fetching
   });
 
   // Mutation for creating analysis
   const {
-    mutate: createAnalysis,
+    mutateAsync: createAnalysis,
     isPending: isCreating,
     error: createError,
   } = useMutation({
     mutationFn: (request: AnalysisRequest) => analysisService.create(request),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['analyses', datasetId] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['analysis', data.id] });
     },
   });
-
-  // Query for getting analysis results
-  const getAnalysisResults = (
-    analysisType: AnalysisType,
-    config: AnalysisConfig
-  ) => {
-    return useQuery({
-      queryKey: ['analysisResults', datasetId, analysisType, config],
-      queryFn: () => analysisService.getResults(datasetId!, analysisType, config),
-      enabled: !!datasetId,
-    });
-  };
 
   // Mutation for deleting analysis
   const {
@@ -58,14 +57,16 @@ export const useAnalysis = (datasetId?: string) => {
     },
   });
 
-  const runAnalysis = (type: AnalysisType, config: AnalysisConfig) => {
+  const runAnalysis = async (type: AnalysisType, config: AnalysisConfig) => {
     if (!datasetId) return;
 
-    createAnalysis({
-      dataset_id: datasetId,
+    const response = await createAnalysis({
+      dataset_id: parseInt(datasetId),
       analysis_type: type,
-      config,
+      config
     });
+
+    return response;
   };
 
   return {
@@ -85,6 +86,5 @@ export const useAnalysis = (datasetId?: string) => {
     // Actions
     runAnalysis,
     deleteAnalysis,
-    getAnalysisResults,
   };
 }; 

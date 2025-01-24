@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid
 from datetime import datetime
+import logging
 
 from app.db.session import get_db
 from app.core.auth import get_current_user
@@ -20,6 +21,7 @@ from app.schemas.analysis import (
 
 router = APIRouter()
 analysis_service = AnalysisService()
+logger = logging.getLogger(__name__)
 
 
 async def run_analysis_task(
@@ -61,49 +63,61 @@ async def run_analysis_task(
         db.commit()
 
 
-@router.post("/analysis", response_model=AnalysisResponse)
+@router.post("", response_model=AnalysisResponse)
 async def create_analysis(
-    *,
-    db: Session = Depends(get_db),
+    request: AnalysisCreate,
     background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    analysis_in: AnalysisCreate,
 ):
     """Create a new analysis."""
-    # Validate dataset exists and user has access
-    dataset = (
-        db.query(Dataset)
-        .filter(
-            Dataset.id == analysis_in.dataset_id, Dataset.user_id == current_user.id
+    try:
+        # Verify dataset exists and belongs to user
+        dataset = (
+            db.query(Dataset)
+            .filter(
+                Dataset.id == request.dataset_id, Dataset.user_id == current_user.id
+            )
+            .first()
         )
-        .first()
-    )
-    if not dataset:
-        raise HTTPException(status_code=404, detail="Dataset not found")
 
-    # Create analysis record
-    analysis = Analysis(
-        id=str(uuid.uuid4()),
-        dataset_id=dataset.id,
-        user_id=current_user.id,
-        name=f"Analysis {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}",
-        type=AnalysisType(analysis_in.analysis_type),
-        config=analysis_in.config.dict(),
-        status=AnalysisStatus.PENDING,
-    )
-    db.add(analysis)
-    db.commit()
-    db.refresh(analysis)
+        if not dataset:
+            raise HTTPException(status_code=404, detail="Dataset not found")
 
-    # Start background task
-    background_tasks.add_task(run_analysis_task, analysis.id, db, analysis_service)
+        # Create analysis record
+        analysis = Analysis(
+            type=request.analysis_type,
+            status=AnalysisStatus.PENDING,
+            parameters=request.config,
+            dataset_id=dataset.id,
+            user_id=current_user.id,
+        )
 
-    return analysis
+        db.add(analysis)
+        db.commit()
+        db.refresh(analysis)
+
+        # Start analysis in background
+        background_tasks.add_task(analysis_service.run_analysis_task, analysis.id, db)
+
+        return AnalysisResponse(
+            id=analysis.id,
+            type=analysis.type,
+            status=analysis.status,
+            dataset_id=analysis.dataset_id,
+            config=analysis.parameters,
+            created_at=analysis.created_at.isoformat(),
+            updated_at=analysis.updated_at.isoformat() if analysis.updated_at else None,
+        )
+
+    except Exception as e:
+        logger.error(f"Error creating analysis: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/analysis/{analysis_id}", response_model=AnalysisResponse)
+@router.get("/{analysis_id}", response_model=AnalysisResponse)
 async def get_analysis(
-    analysis_id: str,
+    analysis_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -113,9 +127,21 @@ async def get_analysis(
         .filter(Analysis.id == analysis_id, Analysis.user_id == current_user.id)
         .first()
     )
+
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
-    return analysis
+
+    return AnalysisResponse(
+        id=analysis.id,
+        type=analysis.type,
+        status=analysis.status,
+        dataset_id=analysis.dataset_id,
+        config=analysis.parameters,
+        results=analysis.results,
+        error=analysis.error_message,
+        created_at=analysis.created_at.isoformat(),
+        updated_at=analysis.updated_at.isoformat() if analysis.updated_at else None,
+    )
 
 
 @router.get("/analysis/{analysis_id}/results", response_model=AnalysisResult)

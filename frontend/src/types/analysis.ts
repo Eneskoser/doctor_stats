@@ -1,6 +1,8 @@
+export type AnalysisType = 'basic' | 'comparative' | 'correlation' | 'chi_square' | 'regression';
+
 export interface Column {
   name: string;
-  type: 'numeric' | 'categorical' | 'datetime' | 'text';
+  type: 'numeric' | 'categorical' | 'datetime';
   uniqueValues: number;
   hasNull: boolean;
 }
@@ -12,14 +14,13 @@ export interface DatasetInfo {
 
 export interface BasicStatistics {
   count: number;
-  mean?: number;
-  median?: number;
-  std?: number;
-  min?: number;
-  max?: number;
-  q1?: number;
-  q3?: number;
-  mode?: string | number;
+  mean: number;
+  median: number;
+  std: number;
+  min: number;
+  max: number;
+  q1: number;
+  q3: number;
   missing: number;
   uniqueCount: number;
 }
@@ -63,8 +64,6 @@ export interface RegressionResult {
   residuals: number[];
 }
 
-export type AnalysisType = 'basic' | 'correlation' | 'comparative' | 'chi_square' | 'regression';
-
 export interface AnalysisConfig {
   targetColumns: string[];
   options: Record<string, any>;
@@ -83,14 +82,30 @@ export interface Analysis {
 }
 
 export interface AnalysisRequest {
-  dataset_id: string;
+  dataset_id: number;
   analysis_type: AnalysisType;
-  config: AnalysisConfig;
+  config: {
+    targetColumns: string[];
+    options: Record<string, any>;
+  };
+}
+
+export interface AnalysisResponse {
+  id: number;
+  type: AnalysisType;
+  status: string;
+  dataset_id: number;
+  config: Record<string, any>;
+  results?: Record<string, any>;
+  error?: string;
+  created_at: string;
+  updated_at?: string;
 }
 
 export interface AnalysisResult {
   id: string;
   type: AnalysisType;
-  data: any;
+  data: BasicStatistics | any;
   created_at: string;
+  error?: string;
 } 

@@ -1,6 +1,8 @@
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field
 from enum import Enum
+from datetime import datetime
+from app.models.analysis import AnalysisType, AnalysisStatus
 
 
 class AnalysisType(str, Enum):
@@ -56,23 +58,29 @@ class AnalysisConfig(BaseModel):
 
 
 class AnalysisCreate(BaseModel):
-    dataset_id: str = Field(..., description="ID of the dataset to analyze")
-    analysis_type: AnalysisType = Field(..., description="Type of analysis to perform")
-    config: Dict[str, Any] = Field(..., description="Analysis configuration")
+    dataset_id: int
+    analysis_type: AnalysisType
+    config: Dict[str, Any]
+
+    class Config:
+        json_encoders = {
+            # Add any custom JSON encoders if needed
+        }
 
 
 class AnalysisResponse(BaseModel):
-    id: str
-    dataset_id: str
-    user_id: str
-    name: str
+    id: int
     type: AnalysisType
-    config: Dict[str, Any]
     status: AnalysisStatus
-    error: Optional[str] = None
+    dataset_id: int
+    config: Dict[str, Any]
     results: Optional[Dict[str, Any]] = None
-    created_at: Optional[str] = None
+    error: Optional[str] = None
+    created_at: str
     updated_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 class BasicStatistics(BaseModel):

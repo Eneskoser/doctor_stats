@@ -57,7 +57,7 @@ from app.api.v1.reports import router as reports_router
 # Include routers with prefix
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users_router, prefix="/api/v1/users", tags=["User Management"])
-app.include_router(analysis_router, prefix="/api/v1/analysis", tags=["Data Analysis"])
+app.include_router(analysis_router, prefix="/api/v1/analysis", tags=["Analysis"])
 app.include_router(datasets_router, prefix="/api/v1/datasets", tags=["Datasets"])
 app.include_router(
     visualizations_router, prefix="/api/v1/visualizations", tags=["Visualizations"]
