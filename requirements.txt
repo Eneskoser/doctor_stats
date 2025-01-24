@@ -1,0 +1,40 @@
+# FastAPI and Server
+fastapi==0.104.1
+uvicorn==0.24.0
+python-multipart==0.0.6
+python-jose==3.3.0
+passlib==1.7.4
+python-dotenv==1.0.0
+email-validator==2.1.0.post1
+
+# Database
+sqlalchemy==2.0.23
+alembic==1.12.1
+psycopg2-binary==2.9.9
+redis==5.0.1
+
+# Data Processing and Analysis
+pandas==2.1.3
+numpy==1.26.2
+scipy==1.11.4
+statsmodels==0.14.0
+
+# Visualization
+plotly==5.18.0
+seaborn==0.13.0
+
+# Excel File Handling
+openpyxl==3.1.2
+xlrd==2.0.1
+
+# Testing
+pytest==7.4.3
+httpx==0.25.2
+
+# AWS SDK (for S3 file storage)
+boto3==1.29.3
+
+# Additional packages
+pydantic==2.5.2
+pydantic-settings==2.1.0
+bcrypt==4.0.1 
