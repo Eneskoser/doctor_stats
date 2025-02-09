@@ -5,6 +5,7 @@ import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Lazy load pages
+const Landing = React.lazy(() => import('./pages/Landing'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const Analysis = React.lazy(() => import('./pages/Analysis'));
 const Visualizations = React.lazy(() => import('./pages/Visualizations'));
@@ -32,13 +33,14 @@ function App() {
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
           {/* Public routes */}
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
           {/* Protected routes */}
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/analysis" element={<Analysis />} />
               <Route path="/visualizations" element={<Visualizations />} />
               <Route path="/reports" element={<Reports />} />

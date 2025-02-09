@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -77,20 +77,24 @@ def get_current_user(
 
 
 @router.post("/register", response_model=UserResponse)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+async def register(
+    username: str = Form(...),
+    password: str = Form(...),
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+):
     # Check if user exists
-    if db.query(User).filter(User.email == user_data.email).first():
+    if db.query(User).filter(User.email == username).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
         )
 
     # Create new user
-    hashed_password = pwd_context.hash(user_data.password)
+    hashed_password = pwd_context.hash(password)
     db_user = User(
-        email=user_data.email,
+        email=username,
         hashed_password=hashed_password,
-        name=user_data.name,
-        organization=user_data.organization,
+        name=name,
     )
     db.add(db_user)
     db.commit()
@@ -99,7 +103,6 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     return UserResponse(
         email=db_user.email,
         name=db_user.name,
-        organization=db_user.organization,
         subscription_tier=db_user.subscription_tier.value,
     )
 

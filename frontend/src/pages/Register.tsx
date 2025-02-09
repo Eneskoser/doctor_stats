@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Container,
@@ -12,24 +12,25 @@ import {
 } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { setCredentials } from '../store/slices/authSlice';
+import { login } from '../store/slices/authSlice';
+import { authService } from '../api/services';
 
 interface RegisterFormData {
-  name: string;
   email: string;
   password: string;
   confirmPassword: string;
+  name: string;
 }
 
 const Register: React.FC = () => {
-  const [formData, setFormData] = React.useState<RegisterFormData>({
-    name: '',
+  const [formData, setFormData] = useState<RegisterFormData>({
     email: '',
     password: '',
     confirmPassword: '',
+    name: '',
   });
-  const [error, setError] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -43,28 +44,16 @@ const Register: React.FC = () => {
   };
 
   const validateForm = () => {
-    if (!formData.name) {
-      setError('Name is required');
-      return false;
-    }
-    if (!formData.email) {
-      setError('Email is required');
-      return false;
-    }
-    if (!formData.password) {
-      setError('Password is required');
-      return false;
-    }
-    if (!formData.confirmPassword) {
-      setError('Please confirm your password');
+    if (!formData.email || !formData.password || !formData.name) {
+      setError('Please fill in all required fields');
       return false;
     }
     if (!/\S+@\S+\.\S+/.test(formData.email)) {
       setError('Please enter a valid email address');
       return false;
     }
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
       return false;
     }
     if (formData.password !== formData.confirmPassword) {
@@ -82,40 +71,19 @@ const Register: React.FC = () => {
     setError(null);
 
     try {
-      console.log('Attempting to register with:', {
+      const response = await authService.register({
         email: formData.email,
+        password: formData.password,
         name: formData.name,
-        // Don't log password
-      });
-      
-      const apiUrl = `${import.meta.env.VITE_API_URL}/auth/register`;
-      console.log('API URL:', apiUrl);
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          name: formData.name,
-        }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Registration failed:', errorData);
-        throw new Error(errorData.detail || 'Registration failed');
-      }
-
-      const data = await response.json();
-      console.log('Registration successful:', { email: data.email, name: data.name });
-      dispatch(setCredentials(data));
-      navigate('/');
-    } catch (err) {
+      // Auto login after successful registration
+      const loginResponse = await authService.login(formData.email, formData.password);
+      dispatch(login(loginResponse));
+      navigate('/dashboard');
+    } catch (err: any) {
       console.error('Registration error:', err);
-      setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
+      setError(err.response?.data?.detail || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -190,7 +158,6 @@ const Register: React.FC = () => {
               label="Confirm Password"
               type="password"
               id="confirmPassword"
-              autoComplete="new-password"
               value={formData.confirmPassword}
               onChange={handleInputChange}
               error={!!error && !formData.confirmPassword}
@@ -202,7 +169,7 @@ const Register: React.FC = () => {
               sx={{ mt: 3, mb: 2 }}
               disabled={loading}
             >
-              {loading ? 'Creating Account...' : 'Create Account'}
+              {loading ? 'Creating Account...' : 'Register'}
             </Button>
             <Grid container justifyContent="flex-end">
               <Grid item>

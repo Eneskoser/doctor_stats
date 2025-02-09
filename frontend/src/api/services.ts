@@ -56,10 +56,23 @@ axiosInstance.interceptors.response.use(
 );
 
 export const authService = {
+  register: async (data: { email: string; password: string; name: string }) => {
+    const formData = new FormData();
+    formData.append('username', data.email); // Backend expects 'username'
+    formData.append('password', data.password);
+    formData.append('name', data.name);
+    
+    const response = await axiosInstance.post('/auth/register', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   login: async (email: string, password: string) => {
-    // Create form data
     const formData = new URLSearchParams();
-    formData.append('username', email); // Backend expects 'username' field
+    formData.append('username', email);
     formData.append('password', password);
     
     const response = await axiosInstance.post('/auth/login', formData, {
@@ -69,27 +82,22 @@ export const authService = {
     });
 
     if (response.data.access_token) {
-      // Store the token
+      // Get user data after successful login
       const token = response.data.access_token;
-      localStorage.setItem('token', token);
       
-      // Fetch user data
-      const userResponse = await axiosInstance.get('/users/me', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // Set token in axios instance
+      axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      // Get user data
+      const userResponse = await axiosInstance.get('/users/me');
       
       return {
-        user: userResponse.data,
         token: token,
+        user: userResponse.data,
       };
     }
-    return response.data;
-  },
-  register: async (email: string, password: string, name: string) => {
-    const response = await axiosInstance.post('/auth/register', { email, password, name });
-    return response.data;
+    
+    throw new Error('Login failed: No access token received');
   },
 };
 

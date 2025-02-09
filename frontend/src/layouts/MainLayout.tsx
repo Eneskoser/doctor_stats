@@ -31,6 +31,7 @@ import {
 import { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
 import { Suspense } from 'react';
+import React from 'react';
 
 const drawerWidth = 240;
 
@@ -38,7 +39,7 @@ const MainLayout = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { user } = useSelector((state: RootState) => state.auth);
+  const { user, token } = useSelector((state: RootState) => state.auth);
   
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -88,6 +89,13 @@ const MainLayout = () => {
       </List>
     </div>
   );
+
+  // Redirect to landing page if not authenticated
+  React.useEffect(() => {
+    if (!token) {
+      navigate('/');
+    }
+  }, [token, navigate]);
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>

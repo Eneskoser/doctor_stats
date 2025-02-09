@@ -14,17 +14,35 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { CloudUpload as CloudUploadIcon } from '@mui/icons-material';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useAnalysis, useAnalysisStatus } from '../hooks/useAnalysis';
 import { datasetService } from '../api/services';
 import { AnalysisType } from '../types/analysis';
 import LoadingWrapper from '../components/common/LoadingWrapper';
-import { analysisService } from '../api/services';
+
+interface DescriptiveStatistics {
+  count: number;
+  mean: number;
+  std: number;
+  min: number;
+  max: number;
+  median: number;
+  '0.25': number;
+  '0.75': number;
+}
+
+interface AnalysisResult {
+  descriptive_statistics: {
+    [key: string]: DescriptiveStatistics;
+  };
+}
 
 const Analysis: React.FC = () => {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [analysisType, setAnalysisType] = React.useState<AnalysisType | ''>('');
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [results, setResults] = React.useState<AnalysisResult | null>(null);
   const [datasetId, setDatasetId] = React.useState<string | null>(null);
   const [analysisId, setAnalysisId] = React.useState<number | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -53,6 +71,33 @@ const Analysis: React.FC = () => {
     fileInputRef.current?.click();
   };
 
+  const transformResultsToRows = (results: AnalysisResult) => {
+    return Object.entries(results.descriptive_statistics).map(([column, stats], index) => ({
+      id: index,
+      column,
+      count: stats.count,
+      mean: stats.mean.toFixed(1),
+      std: stats.std.toFixed(1),
+      min: stats.min.toFixed(1),
+      max: stats.max.toFixed(1),
+      median: stats.median.toFixed(1),
+      quartile25: stats['0.25'].toFixed(1),
+      quartile75: stats['0.75'].toFixed(1),
+    }));
+  };
+
+  const columns: GridColDef[] = [
+    { field: 'column', headerName: 'Column', flex: 1 },
+    { field: 'count', headerName: 'Count', flex: 1 },
+    { field: 'mean', headerName: 'Mean', flex: 1 },
+    { field: 'std', headerName: 'Std Dev', flex: 1 },
+    { field: 'min', headerName: 'Min', flex: 1 },
+    { field: 'max', headerName: 'Max', flex: 1 },
+    { field: 'median', headerName: 'Median', flex: 1 },
+    { field: 'quartile25', headerName: '25th Percentile', flex: 1 },
+    { field: 'quartile75', headerName: '75th Percentile', flex: 1 },
+  ];
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedFile || !analysisType) {
@@ -62,7 +107,7 @@ const Analysis: React.FC = () => {
 
     setLoading(true);
     setError(null);
-    
+
     try {
       // Upload the file and start analysis in sequence
       const dataset = await datasetService.uploadDataset(selectedFile);
@@ -73,9 +118,10 @@ const Analysis: React.FC = () => {
         targetColumns: [],
         options: {}
       });
-      
+
       if (analysisResponse) {
         setAnalysisId(analysisResponse.id);
+        setResults(analysisResponse.results);
         // Clear the form after successful submission
         setSelectedFile(null);
         setAnalysisType('');
@@ -97,48 +143,11 @@ const Analysis: React.FC = () => {
     if (analysisStatus) {
       if (analysisStatus.status === 'failed') {
         setError(analysisStatus.error || 'Analysis failed');
-      } else if (analysisStatus.status === 'completed') {
-        // Handle completed analysis
-        console.log('Analysis results:', analysisStatus.results);
+      } else if (analysisStatus.status === 'completed' && analysisStatus.results) {
+        setResults(analysisStatus.results);
       }
     }
   }, [analysisStatus]);
-
-  // Render analysis results
-  const renderResults = () => {
-    if (!analysisStatus) return null;
-
-    switch (analysisStatus.status) {
-      case 'pending':
-      case 'processing':
-        return (
-          <Box display="flex" alignItems="center" gap={2}>
-            <CircularProgress size={20} />
-            <Typography>Analysis in progress...</Typography>
-          </Box>
-        );
-      
-      case 'completed':
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom>Analysis Results</Typography>
-            <pre style={{ overflow: 'auto', maxHeight: '400px' }}>
-              {JSON.stringify(analysisStatus.results, null, 2)}
-            </pre>
-          </Box>
-        );
-      
-      case 'failed':
-        return (
-          <Typography color="error">
-            Analysis failed: {analysisStatus.error}
-          </Typography>
-        );
-      
-      default:
-        return null;
-    }
-  };
 
   return (
     <Container maxWidth="lg">
@@ -149,7 +158,7 @@ const Analysis: React.FC = () => {
 
         <LoadingWrapper isLoading={loading} error={error}>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={8}>
+            <Grid item xs={12} md={4}>
               <Paper elevation={3}>
                 <Box p={3}>
                   <form onSubmit={handleSubmit}>
@@ -207,33 +216,46 @@ const Analysis: React.FC = () => {
               </Paper>
             </Grid>
 
-            <Grid item xs={12} md={4}>
-              <Paper>
-                <Box p={3}>
+            {results && (
+              <Grid item xs={12}>
+                <Paper sx={{ p: 3, mt: 3 }}>
                   <Typography variant="h6" gutterBottom>
-                    Analysis Guide
+                    Analysis Results
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    1. Upload a CSV file containing your dataset
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    2. Select the type of analysis you want to perform
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    3. Click "Start Analysis" to begin processing
-                  </Typography>
-                </Box>
-              </Paper>
-
-              {/* Results Section */}
-              {analysisStatus && (
-                <Paper sx={{ mt: 3 }}>
-                  <Box p={3}>
-                    {renderResults()}
+                  <Box sx={{ 
+                    width: '100%',
+                    '& .MuiDataGrid-columnHeaders': {
+                      backgroundColor: '#f5f5f5',  // Light gray background
+                      fontSize: '1rem',
+                    },
+                    '& .MuiDataGrid-cell': {
+                      fontSize: '0.95rem',
+                    }
+                  }}>
+                    <DataGrid
+                      rows={transformResultsToRows(results)}
+                      columns={columns}
+                      pageSize={10}
+                      rowsPerPageOptions={[5, 10, 20]}
+                      disableSelectionOnClick
+                      autoHeight
+                      headerHeight={56}
+                      sx={{
+                        '& .MuiDataGrid-columnHeader': {
+                          padding: '0 16px',
+                          whiteSpace: 'normal',
+                          lineHeight: '1.2',
+                          color: 'black',  // Black text for headers
+                        },
+                        '& .MuiDataGrid-row': {
+                          backgroundColor: 'white',
+                        },
+                      }}
+                    />
                   </Box>
                 </Paper>
-              )}
-            </Grid>
+              </Grid>
+            )}
           </Grid>
         </LoadingWrapper>
       </Box>
@@ -241,4 +263,4 @@ const Analysis: React.FC = () => {
   );
 };
 
-export default Analysis; 
+export default Analysis;

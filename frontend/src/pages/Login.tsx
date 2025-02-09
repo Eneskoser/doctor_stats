@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Container,
@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { setCredentials, setError as setAuthError } from '../store/slices/authSlice';
+import { login } from '../store/slices/authSlice';
 import { authService } from '../api/services';
 
 interface LoginFormData {
@@ -64,15 +64,18 @@ const Login: React.FC = () => {
 
     try {
       const response = await authService.login(formData.email, formData.password);
-      dispatch(setCredentials({
-        user: response.user,
+      
+      // Dispatch login action with both token and user data
+      dispatch(login({
         token: response.token,
+        user: response.user
       }));
-      navigate('/');
+
+      // Navigate to dashboard
+      navigate('/dashboard', { replace: true });
     } catch (err: any) {
       console.error('Login error:', err);
-      setError(err.response?.data?.message || 'Failed to login. Please try again.');
-      dispatch(setAuthError(err.response?.data?.message || 'Failed to login'));
+      setError(err.response?.data?.detail || 'Login failed');
     } finally {
       setLoading(false);
     }

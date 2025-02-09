@@ -1,22 +1,15 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-interface User {
-  email: string;
-  fullName: string;
-  organization: string;
-  subscriptionTier: 'free' | 'premium';
-}
-
 interface AuthState {
-  user: User | null;
   token: string | null;
+  user: any | null;
   isLoading: boolean;
   error: string | null;
 }
 
 const initialState: AuthState = {
+  token: localStorage.getItem('token'),
   user: null,
-  token: null,
   isLoading: false,
   error: null,
 };
@@ -25,13 +18,15 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setCredentials: (
-      state,
-      action: PayloadAction<{ user: User; token: string }>
-    ) => {
-      state.user = action.payload.user;
+    login: (state, action: PayloadAction<{ token: string; user: any }>) => {
       state.token = action.payload.token;
-      state.error = null;
+      state.user = action.payload.user;
+      localStorage.setItem('token', action.payload.token);
+    },
+    logout: (state) => {
+      state.token = null;
+      state.user = null;
+      localStorage.removeItem('token');
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
@@ -40,13 +35,8 @@ const authSlice = createSlice({
       state.error = action.payload;
       state.isLoading = false;
     },
-    logout: (state) => {
-      state.user = null;
-      state.token = null;
-      state.error = null;
-    },
   },
 });
 
-export const { setCredentials, setLoading, setError, logout } = authSlice.actions;
+export const { login, logout, setLoading, setError } = authSlice.actions;
 export default authSlice.reducer; 

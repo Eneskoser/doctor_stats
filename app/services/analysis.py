@@ -96,59 +96,22 @@ class AnalysisService:
 
     async def _basic_statistics(
         self, df: pd.DataFrame, config: Dict[str, Any]
-    ) -> BasicStatistics:
+    ) -> Dict[str, Any]:
         """Calculate basic statistics for numeric columns."""
-        columns = config.get("columns", [])
-        if not columns:
-            columns = df.select_dtypes(include=[np.number]).columns.tolist()
-
-        stats_df = (
-            df[columns]
-            .agg(
-                [
-                    "count",
-                    "mean",
-                    "std",
-                    "min",
-                    "max",
-                    "median",
-                    lambda x: x.skew(),
-                    lambda x: x.kurtosis(),
-                ]
-            )
-            .round(4)
-        )
-
-        stats_df.index = [
-            "count",
-            "mean",
-            "std",
-            "min",
-            "max",
-            "median",
-            "skewness",
-            "kurtosis",
-        ]
-
-        # Replace NaN values with None for JSON serialization
-        stats_df = stats_df.replace({np.nan: None, np.inf: None, -np.inf: None})
-
-        # Calculate quartiles
-        quartiles = df[columns].quantile([0.25, 0.75]).round(4)
-        stats_df = pd.concat([stats_df, quartiles])
-
-        # Calculate missing values
-        missing = df[columns].isnull().sum()
-        missing_pct = (missing / len(df) * 100).round(2)
-        missing_stats = pd.DataFrame(
-            {"missing_count": missing, "missing_percentage": missing_pct}
-        )
-
-        return {
-            "descriptive_statistics": stats_df.replace({np.nan: None}).to_dict(),
-            "missing_data": missing_stats.replace({np.nan: None}).to_dict(),
-            "column_types": {col: str(df[col].dtype) for col in columns},
-        }
+        stats = {}
+        for column in df.select_dtypes(include=[np.number]).columns:
+            column_stats = df[column].describe()
+            stats[column] = {
+                "count": int(column_stats["count"]),
+                "mean": float(column_stats["mean"]),
+                "std": float(column_stats["std"]),
+                "min": float(column_stats["min"]),
+                "max": float(column_stats["max"]),
+                "median": float(df[column].median()),
+                "0.25": float(column_stats["25%"]),
+                "0.75": float(column_stats["75%"]),
+            }
+        return {"descriptive_statistics": stats}
 
     async def _comparative_analysis(
         self, df: pd.DataFrame, config: Dict[str, Any]
